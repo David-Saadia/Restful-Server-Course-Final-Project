@@ -1,7 +1,13 @@
 
 const Cost = require("../models/costs");
 const Report = require("../models/report");
-const {addToUserTotal} = require("usersController");
+const {addToUserTotal} = require("./usersController");
+
+/*
+    response.status(_status).json({obj});
+    Automatically sets header "Content-Type":"application.json", "stringify"s the object, and ends the response.
+ */
+
 
 /**
  * This function adds a new item to the costs collection on the database.
@@ -12,30 +18,31 @@ const {addToUserTotal} = require("usersController");
  *
  * @param request - request received from client
  * @param {String} request.body.category - cost item description
- * @param {String} request.body.userid - userid that initiated the purchase
+ * @param {Number} request.body.userid - userid that initiated the purchase
  * @param {Number} request.body.sum - cost item sum
  * @param response - response to send back to client
  * @returns {Promise<void>}
  */
 exports.addCost = async (request, response) => {
+        const {userid, sum } = request.body;
     try{
-        //Add cost to user's total sum to implement the Computed Design Pattern.
-        const {userid, sum} = request.body;
+        //Attempt to add cost to user's total sum to implement the Computed Design Pattern.
         const additionResult = await addToUserTotal(userid, sum);
-        if(!additionResult){
-            return response.status(404).json({"errorMessage":"User not found.\nAborting expense addition operation.."});
-        }
+        if (!additionResult) {
+            return response.status(404).json({"errorMessage":`User not found.`});}
+
         const addedCost = await Cost.create(request.body);
-        //Automatically sets header "Content-Type" : "application.json", "stringify"s the object, and ends the response.
-        response.status(201).json(addedCost);
+        //Stripping unwanted attributes (like _id and __v)
+        const {_id, __v, ...rest} = addedCost.toObject();
         const {date} = addedCost;
+        response.status(201).json(rest);
 
         //Handling removing cached report (if it exists)
         await removeCachedReport(userid,date);
     }
     catch (err){
         console.log(err);
-        response.status(500).json({"errorMessage": "Something went wrong...\nError: " + err.message});
+        response.status(err.status|| 500).json({"errorMessage": err.message});
     }
 }
 
@@ -58,26 +65,29 @@ exports.addCost = async (request, response) => {
  */
 exports.getReport = async (request, response) => {
     //Pull the values from the query string
-    const { id, year:yearQuery, month:monthQuery} = request.query;
+    const { id:idQuery, year:yearQuery, month:monthQuery} = request.query;
 
     const categories = ["food", "health", "housing", "sport","education"];
     const groupedCosts = {};
-    const validationResult = validateData(id, yearQuery, monthQuery);
+    const validationResult = validateQueryData(idQuery, yearQuery, monthQuery);
     //Initialize an empty array for each category.
     categories.forEach(category => groupedCosts[category] = []);
 
     if (!validationResult.success){
         return response.status(400).json({"errorMessage": validationResult.errorMessage});}
-    const {year, month} = validationResult;
+    const {idNumber, year, month} = validationResult;
+
 
     try{ // Wrap with try...catch when messing with DB operations.
         // Searching for cached report to implement the Computed Design Pattern.
-        const cachedReport = await Report.findOne({userid:id,year:year,month:month});
+        const cachedReport = await Report.findOne({userid:idNumber,year:year,month:month});
         if(cachedReport){
             console.log("Returning cached report...");
-            return response.status(200).json(cachedReport);
+            //Stripping unwanted attributes to match format requirements..
+            const {userid,year:cachedYear, month:cachedMonth, costs:cachedCosts} = cachedReport
+            return response.status(200).json({userid,year:cachedYear, month:cachedMonth, costs:cachedCosts});
         }
-        const filteredCosts = await getCostsByUser(id,year,month);
+        const filteredCosts = await getCostsByUser(idNumber,year,month);
 
         //Populate arrays according to given categories.
         for (const costItem of filteredCosts){
@@ -91,7 +101,7 @@ exports.getReport = async (request, response) => {
         //Wrapping each category with an object to match format requirements
         const categorizedCostsArray = categories.map(category => ({[category]: groupedCosts[category]}));
 
-        const newReport = {"userid": id, year, month, "costs": categorizedCostsArray};
+        const newReport = {"userid": idNumber, year, month, "costs": categorizedCostsArray};
         //Cache report
         Report.create(newReport)
             .then(() => console.log("Report cached successfully"))
@@ -110,7 +120,7 @@ exports.getReport = async (request, response) => {
 /**
  * This function will retrieve cost items by userId and optionally
  * filter them by Date.
- * @param {String} userid - userId to search results by
+ * @param {Number} userid - userId to search results by
  * @param {Number} [year] - The year to filter costs from
  * @param {Number} [month] - the month to filter costs from
  * @returns {Array<mongoose.model>|null} - an array of Cost items
@@ -135,54 +145,52 @@ const getCostsByUser = async (userid, year, month) =>{
 
 /**
  * Simple function to validate received data from the get request query string.
- * @param {String} id - userId to validate
+ * @param {String} idQuery - userId to validate
  * @param {String} yearQuery - yearQuery to validate
  * @param {String} monthQuery - monthQuery to validate
  * @returns {{success: boolean, errorMessage: string}|{success: boolean, year: number, month: number}}
  */
-const validateData = (id, yearQuery, monthQuery) =>{
+const validateQueryData = (idQuery, yearQuery, monthQuery) =>{
+    //Error strings prep
+    const errorStrings = [
+        "Missing required parameter. id, year, and month are required query parameters.",
+        "Received one or more invalid values. Please supply correct values"];
+
     //Check for missing values in request query string
-    if(!id || !yearQuery || !monthQuery){
-        return {
-            success: false,
-            "errorMessage": "Missing required parameter.\n id, year, and month are required query parameters."
-        };
-    }
+    if(!idQuery || !yearQuery || !monthQuery){
+        return {success: false, "errorMessage": errorStrings[0]}; }
+
+    const idNumber = parseInt(idQuery);
     const year = parseInt(yearQuery);
     const month = parseInt(monthQuery);
     //Check for invalid values received by the client:
-    if(isNaN(month) || isNaN(year) || month < 1 || month > 12){
-        return {
-            success: false,
-            "errorMessage": "Received invalid year or month values.\nPlease supply suitable values (month: 1-12)."
-        };
-    }
-    //Returning valid values.
-    return {
-        success: true,
-        year, month
-    };
+    if(isNaN(month) || isNaN(year) || isNaN(idNumber) || idNumber<=0 || month < 1 || month > 12 ){
+        return {success: false, "errorMessage": errorStrings[1]}; }
 
+    //Returning valid values.
+    return {success: true, idNumber, year, month};
 }
 
 /**
  * This function finds and removes a monthly report (if it exists).
- * @param {String} userid - userId to match the report for
+ * @param {Number} userid - userId to match the report for
  * @param {Date} date - Date object to match the report for
  * @returns {Promise<void>}
+ * @throws Error - Thrown by the mongoose module if any failure in writing to database occurs.
  */
 const removeCachedReport = async (userid, date) =>{
     const costDate = new Date(date || Date.now());
     const year = costDate.getFullYear();
-    //dateIndex starts at 0, we save the report with months starting with 1.
-    const month = costDate.getMonth() + 1;
+    const month = costDate.getMonth() + 1; //dateIndex starts at 0, we save the report with months starting with 1.
 
     const deletedReport = await Report.deleteOne({userid,year,month});
     if(deletedReport.deletedCount > 0){
-        console.log(`Cached report for ${month}/${year} for user ${userid} deleted successfully.`);
-    }
+        console.log(`Cached report for ${month}/${year} for user ${userid} deleted successfully.`);}
     else{
-        console.log(`No cached reports found for user ${userid} in the given month.`)
-    }
+        console.log(`No cached reports found for user ${userid} in the given month.`);}
+}
 
+exports.deleteAll = async (request, response) => {
+    await Cost.deleteMany();
+    response.status(200).json({"success": true});
 }

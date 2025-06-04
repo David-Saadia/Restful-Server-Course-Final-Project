@@ -3,8 +3,10 @@ const Schema = mongoose.Schema;
 
 const UsersSchema = new Schema({
     id:{
-        type:String,
+        type:Number,
         required:true,
+        min: [1,"Invalid User ID. Must be greater than 0."],
+        unique:true,
     },
     first_name:{
         type: String,
@@ -15,7 +17,8 @@ const UsersSchema = new Schema({
         required: true
     },
     birthday:{
-        type: String,
+        type: Date,
+        default: Date.now()
     },
     martial_status:{
         type: String,

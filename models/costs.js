@@ -7,10 +7,14 @@ const CostsSchema = new Schema({
     },
     category:{
         type: String,
+        enum:{
+            values: ["food", "health", "housing", "sport","education"],
+            message: `Category {category} does not fit in given set of categories.`},
         required: true
     },
     userid:{
-        type: String,
+        type: Number,
+        min: [1,"Invalid User ID. Must be greater than 0."],
         required: true
     },
     sum:{

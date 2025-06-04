@@ -1,4 +1,4 @@
-const createError = require('http-errors');
+
 const mongoose = require('mongoose');
 const express = require('express');
 const path = require('path');
@@ -9,7 +9,8 @@ const apiRouter = require('./routes/api');
 
 const app = express();
 
-mongoose.connect('mongodb+srv://davidsa12:4k9Z6BngeXpa8N7i@cluster0.mvfsrvg.mongodb.net/restful-backend?retryWrites=true&w=majority&appName=Cluster0')
+
+mongoose.connect(process.env.MONGOOSE_URI)
     .then( () => console.log('Connected to MongoDB Atlas successfully'))
     .catch( (err) => console.log('MongoDB Atlas connection error:',err)
 );

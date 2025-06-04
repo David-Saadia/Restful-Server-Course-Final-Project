@@ -5,17 +5,21 @@ const User = require("../models/users");
  * it in the requested format {first_name, last_name, id, total}.
  * @param response - The response to send back to the client
  * @param request - The request received from the client
- * @param {String} request.params.id - The user id to match.
+ * @param {Number} request.params.id - The user id to match.
  * @returns {Promise<*>}
  */
 exports.getUser = async (request, response) =>{
-    const userid = request.params.id;
+    //Making sure the id parameter does not contain any letters and is not just 0.
+    if(!/^0*[1-9][0-9]*$/.test(request.params.id)){
+        return response.status(400).json({"errorMessage":"Invalid User ID. User ID must contain only digits."})}
+
+    const userid = parseInt(request.params.id);
+
     try{
         const userResult = await User.findOne({ id: userid });
         if(!userResult){
             console.log("No user found");
-            return response.status(404).json({"errorMessage": "No user found"});
-        }
+            return response.status(404).json({"errorMessage": "No user found"}); }
         /** Because we implemented the Computed Design Pattern, we no longer need to retrieve all of
          * the user's expenses and calculate the total. Instead, we have the total attribute rightly available.**/
         const {first_name, last_name, total} = userResult;
@@ -44,12 +48,12 @@ exports.aboutUs = async (request, response) =>{
 
 /**
  * This function adds an expense item sum value to the total attribute of a given user.
- * @param {String} userid - The userId to match for
+ * @param {Number} userid - The userId to match for
  * @param {Number} sum - The sum value to add to the total
  * @returns {Promise<boolean>}
  */
 exports.addToUserTotal = async (userid, sum) =>{
-    try{//Find the user by their id, increase their total by the sum, and return the new document.
+    //Find the user by their id, increase their total by the sum, and return the new document.
         const userResult = await User.findOneAndUpdate(
             { id: userid },{$inc:{total: sum}}, {new: true} );
         if(!userResult){
@@ -57,9 +61,4 @@ exports.addToUserTotal = async (userid, sum) =>{
             return false;
         }
         return true;
-
-    }catch(err){ //Push error to json document wrapping this function
-        throw new Error("Expense couldn't be added to user's total." + err.message);
-    }
-
 }
