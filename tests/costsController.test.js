@@ -13,18 +13,62 @@ const BASE_URL = 'http://localhost:3000';
 const LIVE = true;
 
 
+/**
+ * Helper function to push items into the expectation array (Instead of building it everytime)
+ * @param costItem - costItem to push into the expectation object
+ */
+const pushToPlace = (costItem)=>{
+    const {sum,description} = costItem ;
+    const place = expectation.costs.find(item => item.hasOwnProperty(costItem.category));
+    const today = new Date(Date.now()).getDate();
+    place[costItem.category].push({sum,description, day:today});
+}
+/**
+ * Helper function to set up the expectation object with new expenses
+ * and to send said expenses to the endpoint '/api/add'
+ * @returns {Promise<void>}
+ */
+const setupExpectation = async () => {
+    const costItems = [
+        ...[{description:"Sausage",sum:20},{description:"Cookie Milk",sum:12},{description:"Chicken Bread",sum:35}]
+            .map((item)=>({...item,category:"food",userid:dummyUserID})),
+        ...[{description:"Physics Book",sum:300},{description:"Math Book",sum:150},{description:"Attention is all you need",sum:3500}]
+            .map((item)=>({...item,category:"education",userid:dummyUserID}))
+    ];
+    for (const item of costItems) {
+        pushToPlace(item);
+        await request(app).post('/api/add').send(item);}
+}
+
+//Report Format cost array expectation
+const dummyUserID = 64209;
+let year = 2025;
+let month = 6;
+const expectation = {
+    userid:dummyUserID,  year, month,
+    costs: [
+        {"food":[]},
+        {"health":[]},
+        {"housing":[]},
+        {"sport":[]},
+        {"education":[]}
+    ]
+};
+
+beforeAll(async () => {
+    await Report.deleteMany({userid:dummyUserID});
+    await Cost.deleteMany({userid:dummyUserID});
+    await User.deleteOne({id:dummyUserID});
+    await User.create({id:dummyUserID,first_name:"Johnny", last_name: "Bravo"});});
+
+afterAll(async () => {
+    await Report.deleteMany({userid:dummyUserID});
+    await Cost.deleteMany({userid:dummyUserID});
+    await User.deleteOne({id:dummyUserID});
+});
+
+
 describe('Testing the /add endpoint...', ()=>{
-    const dummyUserID = 64209;
-
-    beforeAll(async () => {
-        await Cost.deleteMany({userid:dummyUserID});
-        await User.deleteOne({id:dummyUserID});
-        await User.create({id:dummyUserID,first_name:"Johnny", last_name: "Bravo"});});
-
-    afterAll(async () => {
-        await Cost.deleteMany({userid:dummyUserID});
-        await User.deleteOne({id:dummyUserID});
-    });
 
     it("Testing correct POST request at endpoint", async () => {
         const addedCostItem = { description:"Chicken Bread", category:"food", userid:dummyUserID, sum:20 };
@@ -49,6 +93,7 @@ describe('Testing the /add endpoint...', ()=>{
         delete addedCostItem.date;
         expect(response.body).toMatchObject(addedCostItem);
     });
+
     it("Testing bad POST request at endpoint - Cause: Bad date value.", async () => {
         const addedCostItem = { description:"Tomato", category:"food", userid:dummyUserID, sum:20, date:"word"};
         const response = await request(app).post(`/api/add`).send(addedCostItem);
@@ -87,64 +132,12 @@ describe('Testing the /add endpoint...', ()=>{
 
 describe('Testing the /report endpoint...', ()=>{
 
-    const dummyUserID = 64209;
-
-    beforeAll(async () => {
-        await Report.deleteMany({userid:dummyUserID});
-        await Cost.deleteMany({userid:dummyUserID});
-        await User.deleteOne({id:dummyUserID});
-        await User.create({id:dummyUserID,first_name:"Johnny", last_name: "Bravo"});});
-
-    afterAll(async () => {
-        await Report.deleteMany({userid:dummyUserID});
-        await Cost.deleteMany({userid:dummyUserID});
-        await User.deleteOne({id:dummyUserID});
-    });
-
-    afterEach(async()=>{
+    beforeEach(async()=>{
         //Reset expectation costs.
         expectation.costs = ["food","health","housing","sport","education"].map(item=>({[item]:[]}) );
         await Cost.deleteMany();
     });
-    let year = 2025;
-    let month = 6;
-    const expectation = {
-        userid:dummyUserID,  year, month,
-        costs: [
-            {"food":[]},
-            {"health":[]},
-            {"housing":[]},
-            {"sport":[]},
-            {"education":[]}
-        ]
-    };
 
-    /**
-     * Helper function to push items into the expectation array (Instead of building it everytime)
-     * @param costItem - costItem to push into the expectation object
-     */
-    const pushToPlace = (costItem)=>{
-        const {sum,description} = costItem ;
-        const place = expectation.costs.find(item => item.hasOwnProperty(costItem.category));
-        const today = new Date(Date.now()).getDate();
-        place[costItem.category].push({sum,description, day:today});
-    }
-    /**
-     * Helper function to set up the expectation object with new expenses
-     * and to send said expenses to the endpoint '/api/add'
-     * @returns {Promise<void>}
-     */
-    const setupExpectation = async () => {
-        const costItems = [
-            ...[{description:"Sausage",sum:20},{description:"Cookie Milk",sum:12},{description:"Chicken Bread",sum:35}]
-                .map((item)=>({...item,category:"food",userid:dummyUserID})),
-            ...[{description:"Physics Book",sum:300},{description:"Math Book",sum:150},{description:"Attention is all you need",sum:3500}]
-                .map((item)=>({...item,category:"education",userid:dummyUserID}))
-        ];
-        for (const item of costItems) {
-            pushToPlace(item);
-            await request(app).post('/api/add').send(item);}
-    }
 
     it("Testing producing empty report", async () => {
 
@@ -230,17 +223,6 @@ LIVE?
     describe('Testing Live Server (run live server)', ()=>{
 
         describe('Testing the /add endpoint...', ()=>{
-            const dummyUserID = 64209;
-
-            beforeAll(async () => {
-                await Cost.deleteMany({userid:dummyUserID});
-                await User.deleteOne({id:dummyUserID});
-                await User.create({id:dummyUserID,first_name:"Johnny", last_name: "Bravo"});});
-
-            afterAll(async () => {
-                await Cost.deleteMany({userid:dummyUserID});
-                await User.deleteOne({id:dummyUserID});
-            });
 
             it("Testing correct POST request at endpoint", async () => {
                 const addedCostItem = { description:"Chicken Bread", category:"food", userid:dummyUserID, sum:20 };
@@ -318,64 +300,12 @@ LIVE?
         });
 
         describe('Testing the /report endpoint...', ()=>{
-            const dummyUserID = 64209;
 
-            beforeAll(async () => {
-                await Report.deleteMany({userid:dummyUserID});
-                await Cost.deleteMany({userid:dummyUserID});
-                await User.deleteOne({id:dummyUserID});
-                await User.create({id:dummyUserID,first_name:"Johnny", last_name: "Bravo"});});
-
-            afterAll(async () => {
-                await Report.deleteMany({userid:dummyUserID});
-                await Cost.deleteMany({userid:dummyUserID});
-                await User.deleteOne({id:dummyUserID});
-            });
-
-            afterEach(async()=>{
+            beforeEach(async()=>{
                 //Reset expectation costs.
                 expectation.costs = ["food","health","housing","sport","education"].map(item=>({[item]:[]}) );
                 await Cost.deleteMany();
             });
-            let year = 2025;
-            let month = 6;
-            const expectation = {
-                userid:dummyUserID,  year, month,
-                costs: [
-                    {"food":[]},
-                    {"health":[]},
-                    {"housing":[]},
-                    {"sport":[]},
-                    {"education":[]}
-                ]
-            };
-
-            /**
-             * Helper function to push items into the expectation array (Instead of building it everytime)
-             * @param costItem - costItem to push into the expectation object
-             */
-            const pushToPlace = (costItem)=>{
-                const {sum,description} = costItem ;
-                const place = expectation.costs.find(item => item.hasOwnProperty(costItem.category));
-                const today = new Date(Date.now()).getDate();
-                place[costItem.category].push({sum,description, day:today});
-            }
-            /**
-             * Helper function to set up the expectation object with new expenses
-             * and to send said expenses to the endpoint '/api/add'
-             * @returns {Promise<void>}
-             */
-            const setupExpectation = async () => {
-                const costItems = [
-                    ...[{description:"Sausage",sum:20},{description:"Cookie Milk",sum:12},{description:"Chicken Bread",sum:35}]
-                        .map((item)=>({...item,category:"food",userid:dummyUserID})),
-                    ...[{description:"Physics Book",sum:300},{description:"Math Book",sum:150},{description:"Attention is all you need",sum:3500}]
-                        .map((item)=>({...item,category:"education",userid:dummyUserID}))
-                ];
-                for (const item of costItems) {
-                    pushToPlace(item);
-                    await request(app).post('/api/add').send(item);}
-            }
 
             it("Testing producing empty report", async () => {
 

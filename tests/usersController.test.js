@@ -4,7 +4,7 @@ const app = require('../app');
 
 const axios = require('axios');// Testing using real server
 const BASE_URL = 'http://localhost:3000';
-const LIVE = false;
+const LIVE = true;
 
 describe('Testing the /about endpoint...', ()=>{
     const expectation = [
