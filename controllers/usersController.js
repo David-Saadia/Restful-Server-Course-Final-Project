@@ -5,13 +5,16 @@ const User = require("../models/users");
  * it in the requested format {first_name, last_name, id, total}.
  * @param response - The response to send back to the client
  * @param request - The request received from the client
- * @param {Number} request.params.id - The user id to match.
+ * @param {String} request.params.id - The user id to match.
  * @returns {Promise<*>}
  */
 exports.getUser = async (request, response) =>{
     //Making sure the id parameter does not contain any letters and is not just 0.
-    if(!/^0*[1-9][0-9]*$/.test(request.params.id)){
-        return response.status(400).json({"errorMessage":"Invalid User ID. User ID must contain only digits."})}
+    const testUIDResult = await exports.testUIDExists(request.params.id);
+    if(testUIDResult!== 0){
+        return (testUIDResult===-1)
+            ? response.status(400).json({"errorMessage":"Invalid User ID. User ID must contain only digits."})
+            : response.status(404).json({"errorMessage":"Invalid User ID. User doesnt exist."}); }
 
     const userid = parseInt(request.params.id);
 
@@ -54,11 +57,19 @@ exports.aboutUs = async (request, response) =>{
  */
 exports.addToUserTotal = async (userid, sum) =>{
     //Find the user by their id, increase their total by the sum, and return the new document.
-        const userResult = await User.findOneAndUpdate(
-            { id: userid },{$inc:{total: sum}}, {new: true} );
-        if(!userResult){
-            console.log("User not found.\nAdding expense to user total failed.");
-            return false;
-        }
-        return true;
+      await User.findOneAndUpdate({ id: userid },{$inc:{total: sum} });
+}
+
+/**
+ * Checks that the userid format does not contain any letters and is not just 0.
+ * @param {String || Number} userid - userid to test
+ * @returns {Promise<Number>} - 0: success, -1: bad format, -2: user does not exist.
+ */
+exports.testUIDExists = async (userid) =>{
+    const formatMatch = /^0*[1-9][0-9]*$/.test(userid);
+    if (!formatMatch){ return -1;}
+    const uid = parseInt(userid);
+    const resultUser = await User.findOne({id:uid});
+    if (!resultUser){ return -2;}
+    if (formatMatch && resultUser){ return 0;}
 }

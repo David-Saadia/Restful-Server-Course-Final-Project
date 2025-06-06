@@ -3,13 +3,14 @@ const Schema = mongoose.Schema;
 
 const CostsSchema = new Schema({
     description:{
-        type: String
+        type: String,
+        required: true
     },
     category:{
         type: String,
         enum:{
             values: ["food", "health", "housing", "sport","education"],
-            message: `Category {category} does not fit in given set of categories.`},
+            message: `Category {VALUE} does not fit in given set of categories.`},
         required: true
     },
     userid:{

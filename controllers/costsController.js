@@ -1,7 +1,7 @@
 
 const Cost = require("../models/costs");
 const Report = require("../models/report");
-const {addToUserTotal} = require("./usersController");
+const {addToUserTotal, testUIDExists} = require("./usersController");
 
 /*
     response.status(_status).json({obj});
@@ -17,21 +17,26 @@ const {addToUserTotal} = require("./usersController");
  *     we remove the report from the DB.</li></ul>
  *
  * @param request - request received from client
- * @param {String} request.body.category - cost item description
+ * @param {String} request.body.category - expense item description
  * @param {Number} request.body.userid - userid that initiated the purchase
- * @param {Number} request.body.sum - cost item sum
+ * @param {Number} request.body.sum - expense item sum
+ * @param {Date} [request.body.date] - expense item addition date
  * @param response - response to send back to client
  * @returns {Promise<void>}
  */
 exports.addCost = async (request, response) => {
-        const {userid, sum } = request.body;
+        const {userid, sum} = request.body;
+        //BEFORE adding to user total - make sure you validate the request and check if the user exists.
+        const testUIDResult = await testUIDExists(userid);
+        if (testUIDResult !== 0){
+            return (testUIDResult===-1)
+                    ? response.status(400).json({"errorMessage":"Invalid User ID. User ID must contain only digits."})
+                    : response.status(404).json({"errorMessage":"Invalid User ID. User does not exist."}); }
     try{
-        //Attempt to add cost to user's total sum to implement the Computed Design Pattern.
-        const additionResult = await addToUserTotal(userid, sum);
-        if (!additionResult) {
-            return response.status(404).json({"errorMessage":`User not found.`});}
-
         const addedCost = await Cost.create(request.body);
+        //Attempt to add cost to user's total sum to implement the Computed Design Pattern.
+        await addToUserTotal(userid, sum);
+
         //Stripping unwanted attributes (like _id and __v)
         const {_id, __v, ...rest} = addedCost.toObject();
         const {date} = addedCost;
@@ -42,7 +47,7 @@ exports.addCost = async (request, response) => {
     }
     catch (err){
         console.log(err);
-        response.status(err.status|| 500).json({"errorMessage": err.message});
+        response.status(500).json({"errorMessage": err.message});
     }
 }
 
@@ -69,7 +74,7 @@ exports.getReport = async (request, response) => {
 
     const categories = ["food", "health", "housing", "sport","education"];
     const groupedCosts = {};
-    const validationResult = validateQueryData(idQuery, yearQuery, monthQuery);
+    const validationResult = await validateQueryData(idQuery, yearQuery, monthQuery);
     //Initialize an empty array for each category.
     categories.forEach(category => groupedCosts[category] = []);
 
@@ -88,16 +93,18 @@ exports.getReport = async (request, response) => {
             return response.status(200).json({userid,year:cachedYear, month:cachedMonth, costs:cachedCosts});
         }
         const filteredCosts = await getCostsByUser(idNumber,year,month);
-
-        //Populate arrays according to given categories.
-        for (const costItem of filteredCosts){
-            const day = costItem.date.getDate();
-            if( groupedCosts.hasOwnProperty(costItem.category)){
-                groupedCosts[costItem.category].push(
-                    {sum: costItem.sum, description: costItem.description, day});
+        if(filteredCosts){
+            //Populate arrays according to given categories.
+            for (const costItem of filteredCosts){
+                const day = costItem.date.getDate();
+                if( groupedCosts.hasOwnProperty(costItem.category)){
+                    groupedCosts[costItem.category].push(
+                        {sum: costItem.sum, description: costItem.description, day});
+                }
+                else{ console.log("No matching category for cost item.\nSkipping..."); }
             }
-            else{ console.log("No matching category for cost item.\nSkipping..."); }
-        }// Current format: {food:[],sports:[],health:[],...} ---> requested format: {{food:[]},{sport:[]},{health:[]},...}
+        }
+        // Current format: {food:[],sports:[],health:[],...} ---> requested format: {{food:[]},{sport:[]},{health:[]},...}
         //Wrapping each category with an object to match format requirements
         const categorizedCostsArray = categories.map(category => ({[category]: groupedCosts[category]}));
 
@@ -150,21 +157,26 @@ const getCostsByUser = async (userid, year, month) =>{
  * @param {String} monthQuery - monthQuery to validate
  * @returns {{success: boolean, errorMessage: string}|{success: boolean, year: number, month: number}}
  */
-const validateQueryData = (idQuery, yearQuery, monthQuery) =>{
+const validateQueryData = async (idQuery, yearQuery, monthQuery)  =>{
     //Error strings prep
     const errorStrings = [
         "Missing required parameter. id, year, and month are required query parameters.",
-        "Received one or more invalid values. Please supply correct values"];
-
-    //Check for missing values in request query string
-    if(!idQuery || !yearQuery || !monthQuery){
+        "Received one or more invalid values. Please supply correct values",
+        "Bad UserID format. Please supply UserID that has no letters and is greater than 0.",
+        "User does not exist."];
+    const testResult = await testUIDExists(idQuery);
+    if(testResult!==0){
+            return {success:false, "errorMessage":(testResult===-1)?errorStrings[2]:errorStrings[3] }; }
+    const regexTest = /^[1-9][0-9]*$/; //Format: Greater than 0, no letters.
+    //Check for missing or bad values in request query string
+    if(!idQuery || !yearQuery || !monthQuery || !regexTest.test(yearQuery) || !regexTest.test(monthQuery) ){
         return {success: false, "errorMessage": errorStrings[0]}; }
 
     const idNumber = parseInt(idQuery);
     const year = parseInt(yearQuery);
     const month = parseInt(monthQuery);
     //Check for invalid values received by the client:
-    if(isNaN(month) || isNaN(year) || isNaN(idNumber) || idNumber<=0 || month < 1 || month > 12 ){
+    if( month > 12 || year>2025){
         return {success: false, "errorMessage": errorStrings[1]}; }
 
     //Returning valid values.
