@@ -2,7 +2,7 @@ const mongoose  = require('mongoose');
 const Schema = mongoose.Schema;
 
 const UsersSchema = new Schema({
-    id:{
+    id:{ // Setting up mongoose-side value validation to avoid invalid values at DB.
         type:Number,
         required:true,
         min: [1,"Invalid User ID. Must be greater than 0."],

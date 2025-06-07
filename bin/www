@@ -27,7 +27,7 @@ const server = http.createServer(app);
  */
 
 server.listen(port);
-server.on('error', onError);
+server.on('error', onError); // We dont use this error handler..
 server.on('listening', onListening);
 
 /**

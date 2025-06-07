@@ -1,6 +1,8 @@
 const mongoose  = require('mongoose');
 const Schema = mongoose.Schema;
 
+// Setting up the cached report schema to implement the Computed design pattern.
+
 const ReportsSchema = new Schema({
     userid: {
         type: Number,

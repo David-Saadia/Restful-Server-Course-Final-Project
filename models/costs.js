@@ -8,12 +8,12 @@ const CostsSchema = new Schema({
     },
     category:{
         type: String,
-        enum:{
+        enum:{ // Setting up mongoose-side value validation to avoid invalid values at DB.
             values: ["food", "health", "housing", "sport","education"],
             message: `Category {VALUE} does not fit in given set of categories.`},
         required: true
     },
-    userid:{
+    userid:{ // Setting up mongoose-side value validation to avoid invalid values at DB.
         type: Number,
         min: [1,"Invalid User ID. Must be greater than 0."],
         required: true
