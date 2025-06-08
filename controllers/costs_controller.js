@@ -1,7 +1,7 @@
 
 const Cost = require("../models/costs");
 const Report = require("../models/report");
-const {addToUserTotal, testUIDExists} = require("./usersController");
+const {addToUserTotal, testUIDExists} = require("./users_controller");
 
 /*
     response.status(_status).json({obj});

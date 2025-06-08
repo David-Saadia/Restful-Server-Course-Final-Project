@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 
-const costsController = require('../controllers/costsController');
-const usersController = require('../controllers/usersController');
+const costsController = require('../controllers/costs_controller');
+const usersController = require('../controllers/users_controller');
 
 // Setting up the endpoints routes
 router.post('/add', costsController.addCost);

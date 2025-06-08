@@ -54,7 +54,7 @@ describe('Testing the /users/:id endpoint...', ()=> {
 
 describe('Testing the addToUserTotal function..',  ()=> {
     const User = require("../models/users");
-    const {addToUserTotal} = require('../controllers/usersController');
+    const {addToUserTotal} = require('../controllers/users_controller');
     const dummyUserID = 64209
     beforeAll(async () => {
         await User.create({id:dummyUserID,first_name:"Johnny", last_name: "Bravo"}); });
