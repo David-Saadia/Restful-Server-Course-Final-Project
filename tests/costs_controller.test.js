@@ -9,7 +9,7 @@ const User = require("../models/users");
 // Testing using real server
 const axios = require('axios');
 const Report = require("../models/report");
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = 'https://hit-restful-server-davivi.onrender.com';
 const LIVE = true;
 
 
@@ -28,7 +28,7 @@ const pushToPlace = (costItem)=>{
  * and to send said expenses to the endpoint '/api/add'
  * @returns {Promise<void>}
  */
-const setupExpectation = async () => {
+const setupExpectation = async (live = false) => {
     const costItems = [
         ...[{description:"Sausage",sum:20},{description:"Cookie Milk",sum:12},{description:"Chicken Bread",sum:35}]
             .map((item)=>({...item,category:"food",userid:dummyUserID})),
@@ -37,7 +37,7 @@ const setupExpectation = async () => {
     ];
     for (const item of costItems) {
         pushToPlace(item);
-        await request(app).post('/api/add').send(item);}
+        live? await axios.post(BASE_URL + '/api/add',item) : await request(app).post('/api/add').send(item);}
 }
 
 //Report Format cost array expectation
@@ -315,14 +315,14 @@ LIVE?
             });
 
             it("Testing producing filled report", async () => {
-                await setupExpectation();
+                await setupExpectation(true);
                 const response = await axios.get(BASE_URL +`/api/report/?month=${month}&year=${year}&id=${dummyUserID}`);
                 expect(response.status).toBe(200);
                 expect(response.data).toMatchObject(expectation);
             });
 
             it("Testing producing filled report after caching", async () => {
-                await setupExpectation();
+                await setupExpectation(true);
                 await axios.get(BASE_URL +`/api/report/?month=${month}&year=${year}&id=${dummyUserID}`);
                 //Caching...?
                 const response = await axios.get(BASE_URL +`/api/report/?month=${month}&year=${year}&id=${dummyUserID}`);
@@ -331,7 +331,7 @@ LIVE?
             });
 
             it("Testing producing filled report after adding new cost", async () => {
-                await setupExpectation();
+                await setupExpectation(true);
                 await axios.get(BASE_URL +`/api/report/?month=${month}&year=${year}&id=${dummyUserID}`);
                 //Caching...?
                 const newCostItem = { description:"Fried Rice", category:"food", userid:dummyUserID, sum:5000 };

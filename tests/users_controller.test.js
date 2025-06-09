@@ -3,7 +3,7 @@ const app = require('../app');
 
 
 const axios = require('axios');// Testing using real server
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = 'https://hit-restful-server-davivi.onrender.com';
 const LIVE = true;
 
 describe('Testing the /about endpoint...', ()=>{
